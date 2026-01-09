@@ -8,6 +8,10 @@ Raylib.SetTargetFPS(60);
 var emitters = new List<Emitter>();
 string currentEffect = "Sparks";
 
+// FPS-independent continuous emission
+float emitAccumulator = 0f;
+const float emitRate = 180f;  // particles per second (per emitter)
+
 void SetupSparks()
 {
     emitters.Clear();
@@ -97,6 +101,52 @@ void SetupWater()
     });
 }
 
+void SetupFireworks()
+{
+    emitters.Clear();
+    currentEffect = "4: Fireworks";
+
+    // Main burst - gravity transitions from helping upward to pulling down
+    emitters.Add(new Emitter
+    {
+        Lifetime = (1.5f, 2.5f),
+        Speed = (150f, 250f),
+        Size = (5f, 2f),
+        Color = (Color.White, Color.Magenta),
+        // Start: negative gravity helps particles rise
+        // End: positive gravity pulls them down - creates arc
+        Gravity = new Tween<float>(-200f, 400f, Easing.EaseInQuad),
+        AngleMin = 230f,
+        AngleMax = 310f,  // mostly upward
+    });
+
+    // Sparkle trail - lighter, floatier
+    emitters.Add(new Emitter
+    {
+        Lifetime = (1.0f, 1.8f),
+        Speed = (100f, 180f),
+        Size = (3f, 1f),
+        Color = (Color.Yellow, new Color(255, 100, 50, 0)),
+        // Gentler transition - floats longer before falling
+        Gravity = new Tween<float>(-100f, 300f, Easing.EaseInCubic),
+        AngleMin = 220f,
+        AngleMax = 320f,
+    });
+
+    // Glitter - tiny particles that hover then drift down slowly
+    emitters.Add(new Emitter
+    {
+        Lifetime = (2.0f, 3.0f),
+        Speed = (50f, 100f),
+        Size = (2f, 1f),
+        Color = (Color.Gold, new Color(255, 200, 100, 0)),
+        // Almost zero gravity at start, gently increases - hovering glitter
+        Gravity = new Tween<float>(0f, 150f, Easing.EaseInExpo),
+        AngleMin = 0f,
+        AngleMax = 360f,
+    });
+}
+
 // Start with sparks
 SetupSparks();
 
@@ -108,6 +158,7 @@ while (Raylib.WindowShouldClose() == false)
     if (Raylib.IsKeyPressed(KeyboardKey.One)) SetupSparks();
     if (Raylib.IsKeyPressed(KeyboardKey.Two)) SetupFire();
     if (Raylib.IsKeyPressed(KeyboardKey.Three)) SetupWater();
+    if (Raylib.IsKeyPressed(KeyboardKey.Four)) SetupFireworks();
 
     // Emit particles on mouse click
     if (Raylib.IsMouseButtonPressed(MouseButton.Left))
@@ -120,15 +171,26 @@ while (Raylib.WindowShouldClose() == false)
         }
     }
 
-    // Hold right mouse button for continuous emission
+    // Hold right mouse button for continuous emission (FPS-independent)
     if (Raylib.IsMouseButtonDown(MouseButton.Right))
     {
-        var pos = Raylib.GetMousePosition();
-        foreach (var e in emitters)
+        emitAccumulator += emitRate * dt;
+        int toEmit = (int)emitAccumulator;
+        emitAccumulator -= toEmit;
+
+        if (toEmit > 0)
         {
-            e.Position = pos;
-            e.Emit(3);
+            var pos = Raylib.GetMousePosition();
+            foreach (var e in emitters)
+            {
+                e.Position = pos;
+                e.Emit(toEmit);
+            }
         }
+    }
+    else
+    {
+        emitAccumulator = 0f;  // Reset when not holding
     }
 
     // Update all emitters
@@ -145,7 +207,7 @@ while (Raylib.WindowShouldClose() == false)
     int totalParticles = emitters.Sum(e => e.ParticleCount);
     Raylib.DrawText($"Particles: {totalParticles}", 10, 10, 20, Color.White);
     Raylib.DrawText($"Effect: {currentEffect}", 10, 40, 20, Color.White);
-    Raylib.DrawText("1: Sparks | 2: Fire | 3: Water", 10, 70, 16, Color.Gray);
+    Raylib.DrawText("1: Sparks | 2: Fire | 3: Water | 4: Fireworks", 10, 70, 16, Color.Gray);
     Raylib.DrawText("LMB: burst | RMB: continuous", 10, 95, 16, Color.Gray);
 
     Raylib.EndDrawing();
